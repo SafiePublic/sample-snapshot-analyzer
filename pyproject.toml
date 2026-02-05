@@ -1,0 +1,26 @@
+[project]
+name = "aipf-sample-snapshot-analyzer"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "grpcio==1.76.0",
+    "mypy-protobuf==5.0.0",
+    "pillow==12.1.0",
+    "pydantic==2.12.5",
+]
+
+[dependency-groups]
+dev = [
+    "grpcio-tools==1.76.0",
+    "pytest==9.0.2",
+    "ruff==0.14.14",
+]
+
+[tool.ruff]
+line-length = 110
+exclude = ["*_pb2.py", "*_pb2_grpc.py", "*.pyi"]
+
+[tool.ruff.lint]
+extend-select = ["I"]
