@@ -9,7 +9,7 @@ import threading
 from collections import Counter
 
 import grpc
-from google.protobuf.json_format import ParseDict
+from google.protobuf.json_format import MessageToDict, ParseDict
 from google.protobuf.struct_pb2 import Struct
 from google.protobuf.timestamp_pb2 import Timestamp
 from PIL import Image
@@ -207,7 +207,12 @@ class Analyzer(AnalyzerServiceServicer):
         metadata = dict(context.invocation_metadata())
         request_id = metadata.get("request_id", "unknown")
         device_id = metadata.get("device_id", "unknown")
-        parameters = metadata.get("parameter")  # ユーザーおよびディベロッパーが指定したパラメータ情報を取得
+        # ユーザーおよびディベロッパーが指定したパラメータ情報をリクエストボディから取得
+        parameters = (
+            json.dumps({k: MessageToDict(v) for k, v in request.parameter.items()})
+            if request.parameter
+            else None
+        )
         device_context = metadata.get("context")  # デバイスコンテキスト情報を取得
 
         logging.debug(
@@ -245,6 +250,7 @@ class Analyzer(AnalyzerServiceServicer):
             timestamp=request.images[0].timestamp,
             units=["5minutes", "hourly", "daily"],
             metrics=counter,
+            daily_boundary_timezone="Asia/Tokyo",
         )
         # Event
         # NOTE: ここでは解析結果をもとにイベント情報を生成しています

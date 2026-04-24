@@ -35,7 +35,7 @@ $ uv run pytest tests/
 $ uv sync
 ```
 
-protoファイルに更新がある場合は、以下を実行します。
+protoファイルおよびgrpcio-toolsに更新がある場合は、以下を実行します。
 ```sh
 $ uv run python -m grpc_tools.protoc \
     --proto_path=. \
@@ -65,8 +65,8 @@ $ uv run python -m tools.snapshot_analyzer_client -i samples/test.jpg --device-i
 $ uv run python -m tools.snapshot_analyzer_client -i samples/test.jpg --user-config samples/user_config.json --developer-config samples/developer_config.json --geometry-config samples/geometry_config.json
 ```
 
-特定の`context`を指定して動作を確認する場合は、以下のように`--context`オプションを指定します。  
-デプロイの更新などでセッションが再接続された時に引き継ぎたい情報があればデバイスコンテキストで出力すれば次のセッションでも情報が引き継がれます。  
+特定の`context`を指定して動作を確認する場合は、以下のように`--context`オプションを指定します。
+デプロイの更新などでセッションが再接続された時に引き継ぎたい情報があればデバイスコンテキストで出力すれば次のセッションでも情報が引き継がれます。
 この引き継がれる情報(最後の通知時間など)を`--context`に設定します。
 ```sh
 $ uv run python -m tools.snapshot_analyzer_client -i samples/test.jpg --context samples/context.json
