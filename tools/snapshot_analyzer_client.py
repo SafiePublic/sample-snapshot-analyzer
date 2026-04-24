@@ -72,7 +72,6 @@ def request(
             metadata=[
                 ("request_id", request_id),
                 ("device_id", device_id),
-                ("parameter", json.dumps(params) if params else "{}"),
                 ("context", json.dumps(context) if context else "{}"),
             ],
         )
