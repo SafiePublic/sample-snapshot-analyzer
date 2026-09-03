@@ -1,5 +1,5 @@
 import io
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import create_autospec
 
 import grpc
@@ -7,7 +7,7 @@ import pytest
 from PIL import Image
 
 from analyzer.main import Analyzer
-from proto.snapshot.v1.analyzer_pb2 import AnalyzeRequest
+from analyzer.proto.snapshot.v1.analyzer_pb2 import AnalyzeRequest
 
 
 @pytest.fixture
@@ -27,7 +27,7 @@ def test_request():
     req.images.add()
     req.images[0].name = "test_image.jpg"
     req.images[0].content_type = "image/jpeg"
-    req.images[0].timestamp.FromDatetime(datetime.now(timezone.utc))
+    req.images[0].timestamp.FromDatetime(datetime.now(UTC))
     req.images[0].data = img_bytes
 
     return req

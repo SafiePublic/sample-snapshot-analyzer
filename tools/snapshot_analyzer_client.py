@@ -4,14 +4,14 @@ import json
 import logging
 import os
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import grpc
 from google.protobuf.json_format import MessageToDict
 from PIL import Image
 
-from proto.snapshot.v1.analyzer_pb2 import AnalyzeRequest
-from proto.snapshot.v1.analyzer_pb2_grpc import AnalyzerServiceStub
+from analyzer.proto.snapshot.v1.analyzer_pb2 import AnalyzeRequest
+from analyzer.proto.snapshot.v1.analyzer_pb2_grpc import AnalyzerServiceStub
 from tools.validator import (
     validate_context,
     validate_device_status,
@@ -21,6 +21,8 @@ from tools.validator import (
 )
 
 _GRPC_PORT = 50051
+
+logger = logging.getLogger(__name__)
 
 
 class InputFile:
@@ -50,7 +52,7 @@ def request(
 
     req.images.add()
     if not timestamp:
-        req.images[0].timestamp.FromDatetime(datetime.now(timezone.utc))
+        req.images[0].timestamp.FromDatetime(datetime.now(UTC))
     else:
         req.images[0].timestamp.FromDatetime(timestamp)
     req.images[0].name = image.name
@@ -61,11 +63,11 @@ def request(
             if isinstance(params[p], dict):
                 req.parameter[p].update(params[p])
             else:
-                raise Exception("Invalid parameter is specified")
+                raise TypeError("Invalid parameter is specified")
 
     with grpc.insecure_channel(f"{server_host}:{server_port}") as channel:
-        logging.debug(f"Request body: {req}")
-        logging.info(f"Requesting to {server_host}:{server_port}")
+        logger.debug(f"Request body: {req}")
+        logger.info(f"Requesting to {server_host}:{server_port}")
         stub = AnalyzerServiceStub(channel)
         response = stub.Analyze(
             req,
@@ -158,7 +160,7 @@ if __name__ == "__main__":
     image = InputFile(name=image_name, content_type=image_type, data=image_bytes)
 
     if args.timestamp:
-        timestamp = datetime.fromisoformat(args.timestamp.replace("Z", "+00:00"))
+        timestamp = datetime.fromisoformat(args.timestamp)
     else:
         timestamp = None
 
@@ -203,27 +205,27 @@ if __name__ == "__main__":
 
     if r.HasField("record_metrics"):
         metrics = validate_metrics(MessageToDict(r.record_metrics, preserving_proto_field_name=True))
-        logging.info("  metrics: %s", [m.model_dump() for m in metrics])
+        logger.info("  metrics: %s", [m.model_dump() for m in metrics])
 
     if r.HasField("record_event"):
         event = validate_event(MessageToDict(r.record_event, preserving_proto_field_name=True))
-        logging.info("  event: %s", event.model_dump())
+        logger.info("  event: %s", event.model_dump())
 
     if r.HasField("record_object"):
         object = validate_object(MessageToDict(r.record_object, preserving_proto_field_name=True))
-        logging.info("  object: %s", object.model_dump())
+        logger.info("  object: %s", object.model_dump())
 
     if r.HasField("record_device_status"):
         device_status = validate_device_status(
             MessageToDict(r.record_device_status, preserving_proto_field_name=True)
         )
-        logging.info(
+        logger.info(
             "  device status: %s",
             [d.model_dump() for d in device_status],
         )
     if r.HasField("update_context"):
         validate_context(r.update_context)
-        logging.info(
+        logger.info(
             "  update context: %s",
             MessageToDict(r.update_context, preserving_proto_field_name=True),
         )

@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Annotated, Any, Literal
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import annotated_types
 from google.protobuf import json_format
@@ -12,8 +12,8 @@ def _timezone_validator(v: str | None) -> str | None:
         return None
     try:
         ZoneInfo(v)
-    except Exception:
-        raise ValueError("The timezone is invalid")
+    except (ValueError, ZoneInfoNotFoundError) as e:
+        raise ValueError("The timezone is invalid") from e
     return v
 
 
@@ -116,7 +116,7 @@ class DeviceStatus(BaseModel):
 
 def validate_context(context):
     if context and len(json_format.MessageToJson(context).encode("utf-8")) > 16 * 1024:
-        raise Exception(
+        raise ValueError(
             f"Context size must not be greater than {16 * 1024} bytes: {len(json_format.MessageToJson(context).encode('utf-8'))}"
         )
 
@@ -143,7 +143,10 @@ def validate_object(object: dict[str, Any]) -> Object:
 
 def validate_metrics(metrics: dict[str, Any]) -> list[Metric]:
     metrics_list = []
-    for key in metrics.get("metrics", {}):
+    metrics_dict = metrics.get("metrics", {})
+    if len(metrics_dict.keys()) > 10:
+        raise ValueError(f"The number of metrics label must not be greater than 10: {len(metrics_dict)}")
+    for key in metrics_dict:
         m = Metric(
             timestamp=metrics.get("timestamp"),
             units=metrics.get("units"),
@@ -157,7 +160,10 @@ def validate_metrics(metrics: dict[str, Any]) -> list[Metric]:
 
 def validate_device_status(device_status: dict[str, Any]) -> list[DeviceStatus]:
     device_status_list = []
-    for status in device_status.get("device_status", []):
+    statuses = device_status.get("device_status", [])
+    if len(statuses) > 10:
+        raise ValueError(f"The number of device_status must not be greater than 10: {len(statuses)}")
+    for status in statuses:
         device_status_list.append(
             DeviceStatus(
                 label=status.get("label"),
