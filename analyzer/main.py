@@ -15,19 +15,21 @@ from google.protobuf.timestamp_pb2 import Timestamp
 from PIL import Image
 from pydantic import BaseModel, ConfigDict, Field
 
-from proto.snapshot.v1.analyzer_pb2 import (
+from analyzer.proto.snapshot.v1.analyzer_pb2 import (
     AnalyzeRequest,
     AnalyzeResponse,
     DeviceStatus,
     EventPicture,
     ObjectPicture,
 )
-from proto.snapshot.v1.analyzer_pb2_grpc import (
+from analyzer.proto.snapshot.v1.analyzer_pb2_grpc import (
     AnalyzerServiceServicer,
     add_AnalyzerServiceServicer_to_server,
 )
 
 _GRPC_PORT = 50051
+
+logger = logging.getLogger(__name__)
 
 
 class FrameAnalyzerResult(BaseModel):
@@ -46,8 +48,10 @@ class DummyObjectDetector:
     """ダミーの物体検出器"""
 
     def __init__(self, model_path: str) -> None:
-        # NOTE: ここではコンストラクタでモデルをロードする想定でダミーを実装します。
-        logging.info("Loaded dummy object detector model from %s", model_path)
+        # サンプルコードではモデルファイルの存在のみをチェックします
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"Model file not found: {model_path}")
+        logger.info("Loaded dummy object detector model from %s", model_path)
         # self.model = load_model(model_path)
 
     def detect(self, image: Image.Image) -> list[dict[str, object]]:
@@ -82,7 +86,7 @@ class FrameAnalyzer:
 
     def __init__(self) -> None:
         self._lock: threading.Lock = threading.Lock()
-        self.object_detector: DummyObjectDetector = DummyObjectDetector("dummy_model_path")
+        self.object_detector: DummyObjectDetector = DummyObjectDetector("/app/models/dummy_model.pt")
 
     def convert_params(
         self,
@@ -105,14 +109,18 @@ class FrameAnalyzer:
             try:
                 device_context_dict = json.loads(device_context)
             except json.JSONDecodeError:
-                logging.warning("Failed to parse device_context as JSON.")
+                logger.warning("Failed to parse device_context as JSON.")
         if parameters is not None:
             try:
                 params = json.loads(parameters)
                 user_conf = params.get("user_config", {})
                 dev_conf = params.get("developer_config", {})
+                # NOTE: parameter の数値は float で渡されるため、int32 で扱う geometry_config_id は int に変換する
+                for geometry in user_conf.get("geometries", []):
+                    if "geometry_config_id" in geometry:
+                        geometry["geometry_config_id"] = int(geometry["geometry_config_id"])
             except json.JSONDecodeError:
-                logging.warning("Failed to parse parameters as JSON.")
+                logger.warning("Failed to parse parameters as JSON.")
         return device_context_dict, user_conf, dev_conf
 
     def analyze_image(
@@ -136,14 +144,15 @@ class FrameAnalyzer:
             FrameAnalyzerResult | None: 解析結果
         """
         # NOTE: デバイスID、デバイスコンテキスト、パラメータなどを用いて解析処理を変更できます
-        logging.info(
+        logger.info(
             "FrameAnalyzer got device_id=%s, device_context=%s, parameters=%s",
             device_id,
             device_context,
             parameters,
         )
         # パラメータを変換
-        device_context_dict, user_config, developer_config = self.convert_params(device_context, parameters)
+        # NOTE: user_config / developer_config はサンプルでは未使用ですが、解析ロジックから参照できます
+        device_context_dict, user_config, developer_config = self.convert_params(device_context, parameters)  # noqa: RUF059
         detections = []
         # NOTE: モデルがスレッドセーフでない場合はロックを取得して推論を実行します
         with self._lock:
@@ -164,7 +173,7 @@ class FrameAnalyzer:
         # デバイスコンテキストに変更があれば更新
         # NOTE: デバイスコンテキストは通知間隔などデバイスごとに内部で管理する情報を保持する想定です
         # デバイスコンテキストを戻り値として返却し、AnalyzeResponse.UpdateContextで出力することで、セッションが切り替わっても情報を引き継げます
-        device_context_dict = {"last_updated_at": ts.ToDatetime(tzinfo=datetime.timezone.utc).isoformat()}
+        device_context_dict = {"last_updated_at": ts.ToDatetime(tzinfo=datetime.UTC).isoformat()}
         return FrameAnalyzerResult(
             timestamp=ts,
             thumbnail_data=thumbnail_bytes,
@@ -196,7 +205,7 @@ class Analyzer(AnalyzerServiceServicer):
     def __init__(self) -> None:
         super().__init__()
         self._frame_analyzer: FrameAnalyzer = FrameAnalyzer()
-        logging.info("Initialized Analyzer service.")
+        logger.info("Initialized Analyzer service.")
 
     def Analyze(self, request: AnalyzeRequest, context: grpc.ServicerContext):
         """gRPCで呼び出されるAnalyzeメソッドの実装"""
@@ -215,7 +224,7 @@ class Analyzer(AnalyzerServiceServicer):
         )
         device_context = metadata.get("context")  # デバイスコンテキスト情報を取得
 
-        logging.debug(
+        logger.debug(
             "Analyzing request_id=%s device_id=%s device_context=%s, parameters=%s, timestamp=%s",
             request_id,
             device_id,
@@ -232,7 +241,7 @@ class Analyzer(AnalyzerServiceServicer):
             parameters=parameters,
         )
         if r is None:
-            logging.info(
+            logger.info(
                 "No detection for request_id=%s device_id=%s timestamp=%s",
                 request_id,
                 device_id,
@@ -241,7 +250,10 @@ class Analyzer(AnalyzerServiceServicer):
             return AnalyzeResponse()  # No detection
 
         # Create a response
-        _, user_config, developer_config = self._frame_analyzer.convert_params(parameters)
+        # NOTE: google.protobuf.Structは数値をすべてfloatで扱うため、parameter内の数値をintで扱う場合には明示的に int へ変換する必要があります。
+        # geometry_config_id は convert_params 内で変換済み
+        # NOTE: user_config / developer_config は下のコメントアウト例（geometry_config_ids）で参照します
+        _, user_config, developer_config = self._frame_analyzer.convert_params(parameters=parameters)  # noqa: RUF059
         # Metrics
         # NOTE: ここでは解析結果のdataフィールドに含まれるdetections情報をもとにラベルごとのカウントを集計しています
         detections = r.data.get("detections", []) if r else []
@@ -264,7 +276,7 @@ class Analyzer(AnalyzerServiceServicer):
                 r.data,
                 Struct(),
             ),
-            # geometry_config_ids=[x["geometry_config_id"] for x in user_config["geometries"]], # ジオメトリを使う場合に設定
+            # geometry_config_ids=[x["geometry_config_id"] for x in user_config.get("geometries", [])], # ジオメトリを使う場合に設定
             picture=EventPicture(
                 content_type="image/jpeg",
                 data=r.thumbnail_data,
@@ -283,7 +295,7 @@ class Analyzer(AnalyzerServiceServicer):
                 r.data,
                 Struct(),
             ),
-            # geometry_config_ids=[x["geometry_config_id"] for x in user_config["geometries"]], # ジオメトリを使う場合に設定
+            # geometry_config_ids=[x["geometry_config_id"] for x in user_config.get("geometries", [])], # ジオメトリを使う場合に設定
             picture=[
                 ObjectPicture(
                     label="sample",
@@ -299,7 +311,7 @@ class Analyzer(AnalyzerServiceServicer):
         status.label = "Area1"
         status.status = "crowded"
         status.score = r.score
-        # status.geometry_config_ids.extend([x["geometry_config_id"] for x in user_config["geometries"]]) # ジオメトリを使う場合に設定
+        # status.geometry_config_ids.extend([x["geometry_config_id"] for x in user_config.get("geometries", [])]) # ジオメトリを使う場合に設定
         record_device_status = AnalyzeResponse.RecordDeviceStatus(
             timestamp=request.images[0].timestamp,
             device_status=[status],
@@ -320,7 +332,7 @@ class Analyzer(AnalyzerServiceServicer):
             update_context=update_context,
         )
 
-        logging.info(
+        logger.info(
             "Analyzed request_id=%s device_id=%s timestamp=%s",
             request_id,
             device_id,
@@ -336,7 +348,7 @@ def run(port: int):
 
     listen_addr = f"[::]:{port}"
     server.add_insecure_port(listen_addr)
-    logging.info("Starting server on %s", listen_addr)
+    logger.info("Starting server on %s", listen_addr)
 
     server.start()
     server.wait_for_termination()

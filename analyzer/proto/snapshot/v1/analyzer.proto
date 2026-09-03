@@ -78,6 +78,7 @@ message AnalyzeResponse {
 
         // 時系列上の値で、ラベル (16文字以内の文字列) => 4バイト浮動小数点数 のマップです。
         // 要素数の上限が、契約プランによって設けられる場合があります。
+        // 一つのRecordMetricsで指定可能なラベル数は最大10です。
         map<string, float> metrics = 3;
 
         // 日次メトリクスの境界を決定するためのタイムゾーンです。
@@ -222,7 +223,8 @@ message EventPicture {
     // content_typeは、MIMEタイプ表記で指定します。（例: image/jpeg）
     string content_type = 1;
 
-    // 画像データです
+    // 画像データです。一つのgRPCメッセージのサイズ上限が4MBであるため、
+    // 合計サイズが4MBを超えない範囲で、指定可能です。
     bytes data = 2;
 }
 
@@ -234,7 +236,8 @@ message ObjectPicture {
     // content_typeは、MIMEタイプ表記で指定します。（例: image/jpeg）
     string content_type = 2;
 
-    // 画像データです
+    // 画像データです。一つのgRPCメッセージのサイズ上限が4MBであるため、
+    // 合計サイズが4MBを超えない範囲で、指定可能です。
     bytes data = 3;
 }
 
@@ -243,17 +246,19 @@ message ObjectExtraData {
     // content_typeは、MIMEタイプ表記で指定します。（例: image/jpeg）
     string content_type = 1;
 
-    // 追加のデータです
+    // 追加のデータです。一つのgRPCメッセージのサイズ上限が4MBであるため、
+    // 合計サイズを超えない範囲で、データを出力可能です。
     bytes data = 2;
 }
 
 // DeviceStatusは、デバイスのステータス情報を表します
 message DeviceStatus {
     // ステータスの識別子です。
-    // 同じラベルを持つステータスは同一のステータスとして扱われ、上書きされます
+    // 同じラベルを持つステータスは同一のステータスとして扱われ、上書きされます。
+    // 最大16文字です。
     string label = 1;
 
-    // ステータスを表す文字列です。
+    // ステータスを表す文字列です。最大16文字です。
     string status = 2;
 
     // ステータスを表す数値データです。

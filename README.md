@@ -42,13 +42,24 @@ $ uv run python -m grpc_tools.protoc \
     --python_out=. \
     --grpc_python_out=. \
     --mypy_out=. \
-    proto/snapshot/v1/analyzer.proto
+    analyzer/proto/snapshot/v1/analyzer.proto
 ```
 
 ### Analyzerの起動
-作成したAnalyzerをローカル環境で起動するには、以下のようにコマンドを実行します。
+作成したAnalyzerをローカル環境で起動します。まず、Dockerイメージ（ランタイム）をビルドします。
+
 ```sh
-$ uv run python -m analyzer.main
+$ docker build -t sample-snapshot-analyzer-runtime .
+```
+
+ランタイムを起動します。起動時にアプリケーションコード（analyzerディレクトリ）およびモデルファイル（modelsディレクトリ）をマウントします。
+
+```sh
+$ docker run --rm -p 50051:50051 \
+    -v "$(pwd)/analyzer:/app/analyzer" \
+    -v "$(pwd)/models:/app/models" \
+    sample-snapshot-analyzer-runtime
+server listening at [::]:50051
 ```
 
 ### Analyzerの動作確認
@@ -77,13 +88,36 @@ $ uv run python -m tools.snapshot_analyzer_client -i samples/test.jpg --context 
 $ uv run python -m tools.snapshot_analyzer_client -h
 ```
 
-## Dockerイメージファイルの作成
+## Dockerイメージファイル（ランタイム）の作成
 
-AIソリューションプラットフォーム上にAnalyzerを登録するためには、実装したAnalyzerをtar.gz形式のDockerイメージファイルを作成する必要があります。Dockerイメージファイルは以下のように作成します。
+tar.gz形式のDockerイメージファイル（ランタイム）を作成します。Dockerイメージファイルは以下のように作成します。
 
 ```sh
-$ docker build -t sample-snapshot-analyzer .
-$ docker save sample-snapshot-analyzer | gzip > sample-snapshot-analyzer.tar.gz
+$ docker build -t sample-snapshot-analyzer-runtime .
+$ docker save sample-snapshot-analyzer-runtime | gzip > sample-snapshot-analyzer-runtime.tar.gz
 ```
 
-正常終了すると、`sample-snapshot-analyzer.tar.gz`という名前でDockerイメージファイルが生成されます。この生成されたtar.gz形式ファイルをAIソリューションプラットフォーム上に登録します。
+正常終了すると、`sample-snapshot-analyzer-runtime.tar.gz`という名前でDockerイメージファイルが生成されます。
+この生成されたtar.gz形式ファイルをSafie AI Studio上からランタイムとして登録します。
+
+## マウントファイルの作成
+ランタイムの起動時に特定のpathにマウントするファイル群（ディレクトリ）をそれぞれzip形式で作成します。
+analyzer, modelsのディレクトリ自体を含めないように、ディレクトリ内のファイル・ディレクトリのみを含めるようにします。
+
+```sh
+$ cd analyzer && zip -r ../analyzer.zip . -x "*__pycache__*" && cd ../
+$ cd models && zip -r ../models.zip . && cd ../
+```
+
+作成したzipファイルをSafie AI StudioのUI上から登録します。マウントパスは以下のように指定します。
+
+- analyzer.zip -> `/app/analyzer/`
+- models.zip -> `/app/models/`
+
+## formatterの適用
+ruffを使用したフォーマットのチェックと適用を行います
+
+```sh
+$ uv run ruff check analyzer/ tools/
+$ uv run ruff format analyzer/ tools/
+```

@@ -3,9 +3,9 @@
 import grpc
 import warnings
 
-from proto.snapshot.v1 import analyzer_pb2 as proto_dot_snapshot_dot_v1_dot_analyzer__pb2
+from analyzer.proto.snapshot.v1 import analyzer_pb2 as analyzer_dot_proto_dot_snapshot_dot_v1_dot_analyzer__pb2
 
-GRPC_GENERATED_VERSION = '1.80.0'
+GRPC_GENERATED_VERSION = '1.83.0'
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 
@@ -18,14 +18,14 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + ' but the generated code in proto/snapshot/v1/analyzer_pb2_grpc.py depends on'
+        + ' but the generated code in analyzer/proto/snapshot/v1/analyzer_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
     )
 
 
-class AnalyzerServiceStub(object):
+class AnalyzerServiceStub:
     """AnalyzerService は静止画を受け取り解析結果を返すサービス
     """
 
@@ -37,12 +37,12 @@ class AnalyzerServiceStub(object):
         """
         self.Analyze = channel.unary_unary(
                 '/safie.analyzer.snapshot.v1.AnalyzerService/Analyze',
-                request_serializer=proto_dot_snapshot_dot_v1_dot_analyzer__pb2.AnalyzeRequest.SerializeToString,
-                response_deserializer=proto_dot_snapshot_dot_v1_dot_analyzer__pb2.AnalyzeResponse.FromString,
+                request_serializer=analyzer_dot_proto_dot_snapshot_dot_v1_dot_analyzer__pb2.AnalyzeRequest.SerializeToString,
+                response_deserializer=analyzer_dot_proto_dot_snapshot_dot_v1_dot_analyzer__pb2.AnalyzeResponse.FromString,
                 _registered_method=True)
 
 
-class AnalyzerServiceServicer(object):
+class AnalyzerServiceServicer:
     """AnalyzerService は静止画を受け取り解析結果を返すサービス
     """
 
@@ -65,8 +65,8 @@ def add_AnalyzerServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'Analyze': grpc.unary_unary_rpc_method_handler(
                     servicer.Analyze,
-                    request_deserializer=proto_dot_snapshot_dot_v1_dot_analyzer__pb2.AnalyzeRequest.FromString,
-                    response_serializer=proto_dot_snapshot_dot_v1_dot_analyzer__pb2.AnalyzeResponse.SerializeToString,
+                    request_deserializer=analyzer_dot_proto_dot_snapshot_dot_v1_dot_analyzer__pb2.AnalyzeRequest.FromString,
+                    response_serializer=analyzer_dot_proto_dot_snapshot_dot_v1_dot_analyzer__pb2.AnalyzeResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -76,7 +76,7 @@ def add_AnalyzerServiceServicer_to_server(servicer, server):
 
 
  # This class is part of an EXPERIMENTAL API.
-class AnalyzerService(object):
+class AnalyzerService:
     """AnalyzerService は静止画を受け取り解析結果を返すサービス
     """
 
@@ -95,8 +95,8 @@ class AnalyzerService(object):
             request,
             target,
             '/safie.analyzer.snapshot.v1.AnalyzerService/Analyze',
-            proto_dot_snapshot_dot_v1_dot_analyzer__pb2.AnalyzeRequest.SerializeToString,
-            proto_dot_snapshot_dot_v1_dot_analyzer__pb2.AnalyzeResponse.FromString,
+            analyzer_dot_proto_dot_snapshot_dot_v1_dot_analyzer__pb2.AnalyzeRequest.SerializeToString,
+            analyzer_dot_proto_dot_snapshot_dot_v1_dot_analyzer__pb2.AnalyzeResponse.FromString,
             options,
             channel_credentials,
             insecure,
